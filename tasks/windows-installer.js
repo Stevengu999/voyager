@@ -14,7 +14,7 @@ let resultPromise = electronInstaller.createWindowsInstaller({
   noMsi: true
 })
 
-return resultPromise.then(
+resultPromise.then(
   () => console.log("It worked!"),
   e => console.log(`No dice: ${e.message}`)
 )

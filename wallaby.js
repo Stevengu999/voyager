@@ -1,8 +1,13 @@
 module.exports = function(wallaby) {
   return {
-    files: ["app/src/renderer/**/*", "test/unit/*.spec.js", "package.json"],
+    files: [
+      "app/src/renderer/**/*",
+      "jest.config.js",
+      "tasks/*.js",
+      "test/unit/helpers/*.js"
+    ],
 
-    tests: ["test/unit/**/*.spec.js"],
+    tests: ["test/unit/specs/**/*.spec.js"],
 
     env: {
       type: "node",
@@ -22,15 +27,16 @@ module.exports = function(wallaby) {
     },
 
     setup: function(wallaby) {
-      const jestConfig =
-        require("./package").jest ||
-        require("/Users/billy/cosmos/voyager/jest.config.js")
-      jestConfig.transform = {}
-      wallaby.testFramework.configure(jestConfig)
+      const jestConfig = require("./jest.config.js")
+
+      wallaby.testFramework.configure(
+        Object.assign({}, jestConfig, {
+          transform: undefined
+        })
+      )
     },
 
     testFramework: "jest",
-
     debug: true
   }
 }
