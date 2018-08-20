@@ -707,24 +707,24 @@ const checkGaiaCompatibility = async gaiacliVersionPath => {
   }
 }
 
-const getPersistentPeers = configPath => {
+const seedPeers = configPath => {
   // TODO: user-specified nodes, support switching?
   // TODO: use address to prevent MITM if specified
 
   let configText = fs.readFileSync(configPath, "utf8") // checked before if the file exists
   let configTOML = toml.parse(configText)
 
-  const persistent_peers = _.uniq(
+  const peers = _.uniq(
     (configTOML.p2p.persistent_peers + "," + configTOML.p2p.seeds)
       .split(",")
       .filter(x => x !== "")
       .map(x => (x.indexOf("@") !== -1 ? x.split("@")[1] : x))
   )
 
-  if (persistent_peers.length === 0) {
+  if (peers.length === 0) {
     throw new Error("No seeds specified in config.toml")
   } else {
-    return persistent_peers
+    return peers
   }
 }
 
@@ -762,13 +762,20 @@ async function main() {
   let genesis = JSON.parse(genesisText)
   chainId = genesis.chain_id // is set globaly
 
+  const addressbookPath = join(configPath, "addressbook.json")
+  let addressBookPeers = []
+
+  try {
+    addressBookPeers = require(addressbookPath)
+  } catch (exception) {}
+
   // pick a random seed node from config.toml if not using COSMOS_NODE envvar
-  const persistent_peers = process.env.COSMOS_NODE
+  const peers = process.env.COSMOS_NODE
     ? []
-    : getPersistentPeers(configPath)
+    : addressBookPeers.concat(seedPeers(configPath))
 
   addressbook = new Addressbook(config, root, {
-    persistent_peers,
+    peers,
     onConnectionMessage: message => {
       log(message)
       mainWindow.webContents.send("connection-status", message)

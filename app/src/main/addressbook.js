@@ -10,7 +10,7 @@ module.exports = class Addressbook {
   constructor(
     config,
     configPath,
-    { persistent_peers = [], onConnectionMessage = () => {} } = {}
+    { peers = [], onConnectionMessage = () => {} } = {}
   ) {
     this.peers = []
     this.config = config
@@ -23,16 +23,11 @@ module.exports = class Addressbook {
     }
 
     this.addressbookPath = join(configPath, "addressbook.json")
-    this.loadFromDisc()
 
     // add persistent peers to already stored peers
-    persistent_peers
-      .filter(peer => !this.peerIsKnown(peer))
-      .forEach(peer => this.addPeer(peer))
+    peers.forEach(peer => this.addPeer(peer))
 
-    if (persistent_peers.length > 0) {
-      this.persistToDisc()
-    }
+    this.persistToDisc()
   }
 
   async ping(peerURL) {
@@ -55,29 +50,15 @@ module.exports = class Addressbook {
 
   // adds the new peer to the list of peers
   addPeer(peerURL) {
-    let peerHost = getHostname(peerURL)
-    LOGGING && console.log("Adding new peer:", peerHost)
-    this.peers.push({
-      host: peerHost,
-      // assume that new peers are available
-      state: "available"
-    })
-  }
-
-  loadFromDisc() {
-    // if there is no address book file yet, there are no peers stored yet
-    // the file will be created when persisting any peers to disc
-    let exists = fs.existsSync(this.addressbookPath)
-    if (!exists) {
-      this.peers = []
-      return
+    if (!this.peerIsKnown(peerURL)) {
+      let peerHost = getHostname(peerURL)
+      LOGGING && console.log("Adding new peer:", peerHost)
+      this.peers.push({
+        host: peerHost,
+        // assume that new peers are available
+        state: "available"
+      })
     }
-    let content = fs.readFileSync(this.addressbookPath, "utf8")
-    let peers = JSON.parse(content)
-    this.peers = peers.map(host => ({
-      host,
-      state: "available"
-    }))
   }
 
   persistToDisc() {
@@ -142,8 +123,6 @@ module.exports = class Addressbook {
     let subPeersHostnames = subPeers.map(peer => peer.node_info.listen_addr)
 
     subPeersHostnames
-      // check if we already know the peer
-      .filter(subPeerHostname => !this.peerIsKnown(subPeerHostname))
       // add new peers to state
       .forEach(subPeerHostname => {
         this.addPeer(subPeerHostname)
