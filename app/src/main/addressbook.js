@@ -1,4 +1,3 @@
-const axios = require("axios")
 const url = require("url")
 
 const LOGGING = JSON.parse(process.env.LOGGING || "true") !== false
@@ -7,8 +6,14 @@ module.exports = class Addressbook {
   constructor(
     config,
     persistCallback,
-    { fixedNode = false, peers = [], onConnectionMessage = () => {} } = {}
+    {
+      fetch,
+      fixedNode = false,
+      peers = [],
+      onConnectionMessage = () => {}
+    } = {}
   ) {
+    this.fetch = fetch
     this.peers = []
     this.config = config
     this.onConnectionMessage = onConnectionMessage
@@ -23,9 +28,10 @@ module.exports = class Addressbook {
   async ping(peerURL) {
     let pingURL = `http://${peerURL}:${this.config.default_tendermint_port}`
     this.onConnectionMessage(`pinging node: ${pingURL}`)
-    let nodeAlive = await axios
-      .get(pingURL, { timeout: 3000 })
-      .then(() => true, () => false)
+    let nodeAlive = await this.fetch(pingURL, { timeout: 3000 }).then(
+      () => true,
+      () => false
+    )
     this.onConnectionMessage(
       `Node ${peerURL} is ${nodeAlive ? "alive" : "down"}`
     )
@@ -98,7 +104,7 @@ module.exports = class Addressbook {
   }
 
   async discoverPeers(peerIP) {
-    let subPeers = (await axios.get(
+    let subPeers = (await this.fetch(
       `http://${peerIP}:${this.config.default_tendermint_port}/net_info`
     )).data.result.peers
     let subPeersHostnames = subPeers.map(peer => peer.node_info.listen_addr)

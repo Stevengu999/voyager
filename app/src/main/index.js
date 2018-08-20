@@ -779,6 +779,7 @@ async function main() {
   }
 
   addressbook = new Addressbook(config, persistToDisc, {
+    fetch: axios.get,
     fixedNode: process.env.COSMOS_NODE,
     peers,
     onConnectionMessage: message => {

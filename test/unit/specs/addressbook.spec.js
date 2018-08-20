@@ -1,23 +1,17 @@
-let Addressbook
+const Addressbook = require("src/main/addressbook.js")
 
 const mockConfig = {
   default_tendermint_port: 26657
 }
 
+const mockFetch = async () => {
+  return { data: { result: { peers: [] } } }
+}
+
 describe("Addressbook", () => {
-  beforeEach(() => {
-    jest.resetModules()
-    Addressbook = require("src/main/addressbook.js")
-
-    jest.mock("axios", () => ({
-      get: async () => {
-        return { data: { result: { peers: [] } } }
-      }
-    }))
-  })
-
   it("should add given peers", () => {
     let addressbook = new Addressbook(mockConfig, () => {}, {
+      fetch: mockFetch,
       peers: ["123.456.123.456"]
     })
 
@@ -25,15 +19,8 @@ describe("Addressbook", () => {
   })
 
   it("should return node", async () => {
-    jest.doMock("axios", () => ({
-      get: async () => {
-        return { data: { result: { peers: [] } } }
-      }
-    }))
-    jest.resetModules()
-    Addressbook = require("src/main/addressbook.js")
-
     let addressbook = new Addressbook(mockConfig, () => {}, {
+      fetch: mockFetch,
       onConnectionMessage: console.log,
       peers: ["123.456.123.456"]
     })
@@ -42,8 +29,8 @@ describe("Addressbook", () => {
   })
 
   it("should always return a specified node", async () => {
-    jest.resetModules()
     let addressbook = new Addressbook(mockConfig, () => {}, {
+      fetch: mockFetch,
       fixedNode: true,
       peers: ["123.456.123.456"]
     })
@@ -52,18 +39,15 @@ describe("Addressbook", () => {
   })
 
   it("should cycle though nodes until it finds one that is available", async () => {
-    jest.doMock("axios", () => ({
-      get: async url => {
-        if (url.indexOf("123.456.123.456") !== -1) return Promise.reject()
-        return Promise.resolve({
-          data: { result: { peers: [] } }
-        })
-      }
-    }))
-    jest.resetModules()
-    Addressbook = require("src/main/addressbook.js")
+    const fetch = async url => {
+      if (url.indexOf("123.456.123.456") !== -1) return Promise.reject()
+      return Promise.resolve({
+        data: { result: { peers: [] } }
+      })
+    }
 
     let addressbook = new Addressbook(mockConfig, () => {}, {
+      fetch,
       peers: ["123.456.123.456", "223.456.123.456"]
     })
     let node = await addressbook.pickNode()
@@ -71,15 +55,12 @@ describe("Addressbook", () => {
   })
 
   it("should throw an error if there are no nodes available", async done => {
-    jest.doMock("axios", () => ({
-      get: async () => {
-        return Promise.reject()
-      }
-    }))
-    jest.resetModules()
-    Addressbook = require("src/main/addressbook.js")
+    const fetch = async () => {
+      return Promise.reject()
+    }
 
     let addressbook = new Addressbook(mockConfig, () => {}, {
+      fetch,
       peers: ["123.456.123.456", "223.456.123.456"]
     })
     await addressbook.pickNode().then(done.fail, err => {
@@ -89,15 +70,8 @@ describe("Addressbook", () => {
   })
 
   it("should query peers on connecting to a node", async () => {
-    jest.doMock("axios", () => ({
-      get: async () => {
-        return { data: { result: { peers: [] } } }
-      }
-    }))
-    jest.resetModules()
-    Addressbook = require("src/main/addressbook.js")
-
     let addressbook = new Addressbook(mockConfig, () => {}, {
+      fetch: mockFetch,
       peers: ["123.456.123.456", "223.456.123.456"]
     })
     addressbook.discoverPeers = jest.fn()
@@ -106,30 +80,26 @@ describe("Addressbook", () => {
   })
 
   it("should query and store peers of connected node", async () => {
-    jest.doMock("axios", () => ({
-      get: async () => {
-        return {
-          data: {
-            result: {
-              peers: [
-                {
-                  node_info: {
-                    listen_addr: "323.456.123.456"
-                  }
-                },
-                {
-                  node_info: {
-                    listen_addr: "423.456.123.456"
-                  }
+    const fetch = async () => {
+      return {
+        data: {
+          result: {
+            peers: [
+              {
+                node_info: {
+                  listen_addr: "323.456.123.456"
                 }
-              ]
-            }
+              },
+              {
+                node_info: {
+                  listen_addr: "423.456.123.456"
+                }
+              }
+            ]
           }
         }
       }
-    }))
-    jest.resetModules()
-    Addressbook = require("src/main/addressbook.js")
+    }
 
     let persisted = []
 
@@ -138,6 +108,7 @@ describe("Addressbook", () => {
     }
 
     let addressbook = new Addressbook(mockConfig, persistToDisc, {
+      fetch,
       peers: ["123.456.123.456", "223.456.123.456"]
     })
     await addressbook.discoverPeers("123.456.123.456")
@@ -150,6 +121,7 @@ describe("Addressbook", () => {
 
   it("should provide the ability to reset the state of the nodes to try to reconnect to all, i.e. after an internet outage", async done => {
     let addressbook = new Addressbook(mockConfig, () => {}, {
+      fetch: mockFetch,
       peers: ["123.456.123.456", "223.456.123.456"]
     })
 
@@ -169,6 +141,7 @@ describe("Addressbook", () => {
 
   it("should allow http addresses as peer addresses", async () => {
     let addressbook = new Addressbook(mockConfig, () => {}, {
+      fetch: mockFetch,
       peers: ["http://123.456.123.456"]
     })
     let node = await addressbook.pickNode()
@@ -178,6 +151,7 @@ describe("Addressbook", () => {
   it("should call back on connection", async () => {
     let spy = jest.fn()
     let addressbook = new Addressbook(mockConfig, () => {}, {
+      fetch: mockFetch,
       peers: ["http://123.456.123.456"],
       onConnectionMessage: spy
     })
@@ -187,6 +161,7 @@ describe("Addressbook", () => {
 
   it("should flag nodes incompatible", async done => {
     let addressbook = new Addressbook(mockConfig, () => {}, {
+      fetch: mockFetch,
       peers: ["http://123.456.123.456"]
     })
     addressbook.flagNodeIncompatible("123.456.123.456")
