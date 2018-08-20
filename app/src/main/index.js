@@ -771,10 +771,15 @@ async function main() {
 
   // pick a random seed node from config.toml if not using COSMOS_NODE envvar
   const peers = process.env.COSMOS_NODE
-    ? []
+    ? [process.env.COSMOS_NODE]
     : addressBookPeers.concat(seedPeers(configPath))
 
-  addressbook = new Addressbook(config, root, {
+  const persistToDisc = peers => {
+    fs.writeFileSync(addressbookPath, JSON.stringify(peers), "utf8")
+  }
+
+  addressbook = new Addressbook(config, persistToDisc, {
+    fixedNode: process.env.COSMOS_NODE,
     peers,
     onConnectionMessage: message => {
       log(message)

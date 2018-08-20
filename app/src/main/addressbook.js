@@ -1,33 +1,23 @@
-const fs = require("fs-extra")
-const { join } = require("path")
 const axios = require("axios")
 const url = require("url")
 
 const LOGGING = JSON.parse(process.env.LOGGING || "true") !== false
-const FIXED_NODE = process.env.COSMOS_NODE
 
 module.exports = class Addressbook {
   constructor(
     config,
-    configPath,
-    { peers = [], onConnectionMessage = () => {} } = {}
+    persistCallback,
+    { fixedNode = false, peers = [], onConnectionMessage = () => {} } = {}
   ) {
     this.peers = []
     this.config = config
     this.onConnectionMessage = onConnectionMessage
-
-    // if we define a fixed node, we skip persistence
-    if (FIXED_NODE) {
-      this.addPeer(FIXED_NODE)
-      return
-    }
-
-    this.addressbookPath = join(configPath, "addressbook.json")
+    this.fixedNode = fixedNode
 
     // add persistent peers to already stored peers
     peers.forEach(peer => this.addPeer(peer))
 
-    this.persistToDisc()
+    this.persistToDisc = persistCallback
   }
 
   async ping(peerURL) {
@@ -61,15 +51,6 @@ module.exports = class Addressbook {
     }
   }
 
-  persistToDisc() {
-    let peers = this.peers
-      // only remember available nodes
-      .filter(p => p.state === "available")
-      .map(p => p.host)
-    fs.ensureFileSync(this.addressbookPath)
-    fs.writeFileSync(this.addressbookPath, JSON.stringify(peers), "utf8")
-  }
-
   // returns an available node or throws if it can't find any
   async pickNode() {
     let availableNodes = this.peers.filter(node => node.state === "available")
@@ -90,7 +71,7 @@ module.exports = class Addressbook {
     this.onConnectionMessage("Picked node: " + curNode.host)
 
     // we skip discovery for fixed nodes as we want to always return the same node
-    if (!FIXED_NODE) {
+    if (!this.fixedNode) {
       // remember the peers of the node and store them in the addressbook
       this.discoverPeers(curNode.host)
     }
@@ -129,7 +110,12 @@ module.exports = class Addressbook {
       })
 
     if (subPeersHostnames.length > 0) {
-      this.persistToDisc()
+      let peers = this.peers
+        // only remember available nodes
+        .filter(p => p.state === "available")
+        .map(p => p.host)
+
+      this.persistToDisc(peers)
     }
   }
 }
