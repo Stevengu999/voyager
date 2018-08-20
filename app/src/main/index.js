@@ -778,10 +778,11 @@ async function main() {
     fs.writeFileSync(addressbookPath, JSON.stringify(peers), "utf8")
   }
 
-  addressbook = new Addressbook(config, persistToDisc, {
+  addressbook = new Addressbook(peers, {
+    config,
+    persistToDisc,
     fetch: axios.get,
     fixedNode: process.env.COSMOS_NODE,
-    peers,
     onConnectionMessage: message => {
       log(message)
       mainWindow.webContents.send("connection-status", message)

@@ -3,26 +3,25 @@ const url = require("url")
 const LOGGING = JSON.parse(process.env.LOGGING || "true") !== false
 
 module.exports = class Addressbook {
-  constructor(
-    config,
-    persistCallback,
-    {
-      fetch,
-      fixedNode = false,
-      peers = [],
-      onConnectionMessage = () => {}
-    } = {}
-  ) {
-    this.fetch = fetch
-    this.peers = []
-    this.config = config
-    this.onConnectionMessage = onConnectionMessage
-    this.fixedNode = fixedNode
+  constructor(peers = [], options) {
+    Object.assign(
+      this,
+      {
+        // whether we should use only the single provided peer
+        fixedNode: false,
 
-    // add persistent peers to already stored peers
+        onConnectionMessage: () => {},
+
+        // used for initialization; don't pass this as an option
+        peers: [],
+
+        // a callback that persists a list of peers to disc
+        persistToDisc: () => {}
+      },
+      options
+    )
+
     peers.forEach(peer => this.addPeer(peer))
-
-    this.persistToDisc = persistCallback
   }
 
   async ping(peerURL) {
