@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 * changed ATOM to bondingDenom getter @okwme
 * more bondingDenom and copy updates @jbibla
 * restored loading animation on start @faboweb
+* Nodes are now checked for version compatibility before connection. @NodeGuy
 
 ### Fixed
 
