@@ -515,30 +515,7 @@ Object.entries(eventHandlers).forEach(([event, handler]) => {
 //   })
 // }
 
-// query version of the used SDK via LCD
-async function getNodeVersion() {
-  let versionURL = `http://localhost:${LCD_PORT}/node_version`
-  let nodeVersion = await axios
-    .get(versionURL, { timeout: 3000 })
-    .then(res => res.data)
-    .then(fullversion => fullversion.split("-")[0])
-
-  return nodeVersion
-}
-
-// test an actual node version against the expected one and flag the node if incompatible
-async function testNodeVersion(nodeIP, expectedGaiaVersion, addressbook) {
-  let nodeVersion = await getNodeVersion(nodeIP)
-  let semverDiff = semver.diff(nodeVersion, expectedGaiaVersion)
-  if (semverDiff === "patch" || semverDiff === null) {
-    return { compatible: true, nodeVersion }
-  }
-
-  addressbook.flagNodeIncompatible(nodeIP)
-  return { compatible: false, nodeVersion }
-}
-
-// pick a random node from the addressbook and check if the SDK version is compatible with ours
+// pick a random node from the addressbook.
 async function pickAndConnect(addressbook) {
   let nodeIP
   connecting = true
@@ -552,33 +529,6 @@ async function pickAndConnect(addressbook) {
   }
 
   await connect(nodeIP)
-
-  let compatible, nodeVersion
-  try {
-    const out = await testNodeVersion(
-      nodeIP,
-      expectedGaiaCliVersion,
-      addressbook
-    )
-    compatible = out.compatible
-    nodeVersion = out.nodeVersion
-  } catch (err) {
-    logError(
-      "Error in getting node SDK version, assuming node is incompatible. Error:",
-      err
-    )
-    addressbook.flagNodeIncompatible(nodeIP)
-    return await pickAndConnect(addressbook)
-  }
-
-  if (!compatible) {
-    let message = `Node ${nodeIP} uses SDK version ${nodeVersion} which is incompatible to the version used in Voyager ${expectedGaiaCliVersion}`
-    log(message)
-    mainWindow.webContents.send("connection-status", message)
-
-    return await pickAndConnect(addressbook)
-  }
-
   return nodeIP
 }
 
@@ -774,19 +724,22 @@ async function main() {
     ? [process.env.COSMOS_NODE]
     : addressBookPeers.concat(seedPeers(configPath))
 
+  const onConnectionMessage = message => {
+    log(message)
+    mainWindow.webContents.send("connection-status", message)
+  }
+
   const persistToDisc = peers => {
     fs.writeFileSync(addressbookPath, JSON.stringify(peers), "utf8")
   }
 
   addressbook = new Addressbook(peers, {
     config,
-    persistToDisc,
+    expectedNodeVersion: expectedGaiaCliVersion,
     fetch: axios.get,
     fixedNode: process.env.COSMOS_NODE,
-    onConnectionMessage: message => {
-      log(message)
-      mainWindow.webContents.send("connection-status", message)
-    }
+    onConnectionMessage,
+    persistToDisc
   })
 
   // choose one random node to start from

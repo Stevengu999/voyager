@@ -1,3 +1,4 @@
+let semver = require("semver")
 const url = require("url")
 
 const LOGGING = JSON.parse(process.env.LOGGING || "true") !== false
@@ -7,6 +8,8 @@ module.exports = class Addressbook {
     Object.assign(
       this,
       {
+        expectedNodeVersion: undefined,
+
         // whether we should use only the single provided peer
         fixedNode: false,
 
@@ -25,16 +28,30 @@ module.exports = class Addressbook {
   }
 
   async ping(peerURL) {
-    let pingURL = `http://${peerURL}:${this.config.default_tendermint_port}`
+    let pingURL = `http://${peerURL}:${
+      this.config.default_tendermint_port
+    }/status`
+
     this.onConnectionMessage(`pinging node: ${pingURL}`)
-    let nodeAlive = await this.fetch(pingURL, { timeout: 3000 }).then(
-      () => true,
-      () => false
-    )
+
+    let nodeVersion
+
+    try {
+      nodeVersion = (await this.fetch(pingURL, {
+        timeout: 3000
+      })).data.result.node_info.version
+    } catch (exception) {
+      return false
+    }
+
+    let semverDiff = semver.diff(nodeVersion, this.expectedNodeVersion)
+    const compatible = semverDiff === "patch" || semverDiff === null
+
     this.onConnectionMessage(
-      `Node ${peerURL} is ${nodeAlive ? "alive" : "down"}`
+      `Node ${peerURL} is ${compatible ? "compatible" : "incompatible"}.`
     )
-    return nodeAlive
+
+    return compatible
   }
 
   peerIsKnown(peerURL) {
@@ -87,11 +104,6 @@ module.exports = class Addressbook {
   flagNodeOffline(nodeIP) {
     const host = nodeIP.split(":")[0]
     this.peers.find(p => p.host === host).state = "down"
-  }
-
-  flagNodeIncompatible(nodeIP) {
-    const host = nodeIP.split(":")[0]
-    this.peers.find(p => p.host === host).state = "incompatible"
   }
 
   resetNodes() {
